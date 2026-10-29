@@ -1,3 +1,8 @@
+import json
+from abc import ABC, abstractmethod
+from typing import Self
+
+
 class Task:
     def __init__(self, task_id: int, title: str, done: bool = False):
         self.task_id = task_id
@@ -10,6 +15,13 @@ class Task:
     def __str__(self) -> str:
         mark = 'x' if self._done else ' '
         return f'{self.task_id}. [{mark}] {self.title}'
+
+    def to_dict(self) -> dict:
+        return {'task_id': self.task_id, 'title': self.title, 'done': self._done}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Self:
+        return cls(data['task_id'], data['title'], data['done'])
 
 
 class TaskList:
@@ -34,11 +46,67 @@ class TaskList:
         return iter(self._tasks)
 
 
-tasks = TaskList()
+class Storage(ABC):
+    @abstractmethod
+    def load(self) -> list[Task]:
+        pass
 
-tasks.add('Задача 1')
-tasks.add('Задача 2')
-tasks.get(2).complete()
+    @abstractmethod
+    def save(self, tasks: TaskList) -> None:
+        pass
 
-for task in tasks:
-    print(task)
+
+class JsonStorage(Storage):
+    def __init__(self, path: str):
+        self.path = path
+
+    def load(self) -> list[Task]:
+        try:
+            with open(self.path, encoding='utf-8') as f:
+                return [Task.from_dict(t) for t in json.load(f)]
+        except FileNotFoundError:
+            return []
+        except json.decoder.JSONDecodeError:
+            print('Файл поврежден и не может быть прочитан!')
+            return []
+
+    def save(self, tasks: TaskList) -> None:
+        with open(self.path, 'w', encoding='utf-8') as f:
+            json.dump([t.to_dict() for t in tasks], f, ensure_ascii=False, indent=2)
+
+
+class App:
+    def __init__(self, storage: Storage):
+        self.storage = storage
+        self.tasks = TaskList(storage.load())
+
+    def run(self) -> None:
+        while True:
+            command, _, arg = input('> ').partition(' ')
+            if command == 'add':
+                task = self.tasks.add(arg)
+                print(f'Задача #{task.task_id} добавлена!')
+            elif command == 'done':
+                try:
+                    task_id = int(arg)
+                except ValueError:
+                    print('Номер задачи должен быть целым числом')
+                    continue
+                task = self.tasks.get(task_id)
+                if task is None:
+                    print(f'Задачи #{task_id} нет в списке!')
+                    continue
+                task.complete()
+                print(f'Задача #{task_id} выполнена!')
+            elif command == 'list':
+                if not self.tasks:
+                    print('Список задач пуст!')
+                    continue
+                for task in self.tasks:
+                    print(task)
+            elif command == 'exit':
+                break
+
+
+if __name__ == '__main__':
+    App(JsonStorage('tasks.json')).run()

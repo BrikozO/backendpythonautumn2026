@@ -1,7 +1,12 @@
 [
   {
-    "id": 1,
+    "task_id": 1,
     "title": "закончить занятие",
-    "done": true
+    "done": false
+  },
+  {
+    "task_id": 2,
+    "title": "Закончить еще одно занятие",
+    "done": false
   }
 ]
